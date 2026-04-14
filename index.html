@@ -168,6 +168,10 @@
   <div class="card">
     <div class="section">
       <div class="section-title">Project details</div>
+      <div style="margin-bottom:14px">
+        <label>Customer / project name <span style="color:var(--red)">*</span></label>
+        <input type="text" id="projectName" placeholder="e.g. 456 Oak Ave – Smith" maxlength="80">
+      </div>
       <div class="grid2">
         <div><label>Total square footage (ft²)</label><input type="number" id="sqft" value="1500" min="100" max="20000" step="50" oninput="calc()"></div>
         <div><label>Number of storeys</label>
@@ -250,44 +254,29 @@
   </div>
 </div>
 
-<!-- MODAL: Save choice -->
+<!-- MODAL: Save choice (name required, then pick type) -->
 <div class="modal-bg" id="modalSaveChoice">
   <div class="modal-sm">
     <div class="modal-icon">💾</div>
     <h3>Save estimate</h3>
-    <p>Choose how you'd like to save this estimate</p>
+    <p>Choose how to save this estimate</p>
     <div class="save-choice-grid">
-      <div class="save-choice-card" onclick="openInternalSave()">
+      <div class="save-choice-card" onclick="confirmInternalSave()">
         <div class="choice-icon">🛠️</div>
         <div class="choice-label">Working copy</div>
-        <div class="choice-desc">Save all details for editing and reference later</div>
+        <div class="choice-desc">Save all details for reference and editing later</div>
       </div>
-      <div class="save-choice-card" onclick="openQuotePreview()">
+      <div class="save-choice-card" onclick="confirmQuoteAndPreview()">
         <div class="choice-icon">📄</div>
         <div class="choice-label">Customer quote</div>
-        <div class="choice-desc">Professional quote to present or print for the client</div>
+        <div class="choice-desc">Save then preview the professional client quote</div>
       </div>
     </div>
+    <div class="modal-error" id="saveChoiceError"></div>
     <div class="modal-btns" style="margin-top:16px">
       <button class="modal-btn" onclick="closeModal('modalSaveChoice')">Cancel</button>
     </div>
-  </div>
-</div>
-
-<!-- MODAL: Internal / working save -->
-<div class="modal-bg" id="modalInternal">
-  <div class="modal-sm">
-    <div class="modal-icon">🛠️</div>
-    <h3>Save working copy</h3>
-    <p>Enter a project name to save all estimate details</p>
-    <input type="text" id="internalName" placeholder="e.g. 456 Oak Ave – Smith" maxlength="60"
-      onkeydown="if(event.key==='Enter')confirmInternalSave()">
-    <div class="modal-error" id="internalError"></div>
-    <div class="modal-btns">
-      <button class="modal-btn" onclick="closeModal('modalInternal')">Cancel</button>
-      <button class="modal-btn primary" onclick="confirmInternalSave()">Save</button>
-    </div>
-    <p class="modal-note">Saved to this device's browser storage. Up to 100 estimates are kept.</p>
+    <p class="modal-note">Saved to this device's browser storage. Up to 100 estimates kept.</p>
   </div>
 </div>
 
@@ -297,7 +286,6 @@
     <div id="quoteDoc"></div>
     <div class="quote-actions">
       <button class="quote-print-btn" onclick="window.print()">🖨️ Print / Save PDF</button>
-      <button class="modal-btn" onclick="confirmQuoteSave()" style="flex:none;padding:9px 18px">💾 Save to device</button>
       <button class="modal-btn" onclick="closeModal('modalQuote')" style="flex:none;padding:9px 18px;margin-left:auto">Close</button>
     </div>
   </div>
@@ -496,43 +484,6 @@
     }
   };
 
-  // Save working copy estimate to localStorage
-  window.confirmInternalSave = function(){
-    const name=document.getElementById('internalName').value.trim();
-    if(!name){
-      document.getElementById('internalError').textContent='Project name is required.';
-      document.getElementById('internalName').focus(); return;
-    }
-    const data={...window.gatherData(name), type:'working', savedAt:new Date().toISOString()};
-    try {
-      const raw = localStorage.getItem(LS_ESTIMATES);
-      const estimates = raw ? JSON.parse(raw) : [];
-      estimates.unshift(data); // newest first
-      // Keep last 100 estimates to avoid filling storage
-      if(estimates.length>100) estimates.length=100;
-      localStorage.setItem(LS_ESTIMATES, JSON.stringify(estimates));
-      window.closeModal('modalInternal');
-      window.showToast('Working copy saved — '+name);
-      document.getElementById('internalName').value='';
-      document.getElementById('internalError').textContent='';
-    } catch(e){
-      document.getElementById('internalError').textContent='Save failed — storage may be full.';
-    }
-  };
-
-  // Save quote snapshot to localStorage
-  window.confirmQuoteSave = function(){
-    const data={...window.gatherData(window._quoteProjectName||'Quote'), type:'quote', savedAt:new Date().toISOString()};
-    try {
-      const raw = localStorage.getItem(LS_ESTIMATES);
-      const estimates = raw ? JSON.parse(raw) : [];
-      estimates.unshift(data);
-      if(estimates.length>100) estimates.length=100;
-      localStorage.setItem(LS_ESTIMATES, JSON.stringify(estimates));
-      window.showToast('Quote saved on this device ✓');
-    } catch(e){ window.showToast('Save failed — storage may be full'); }
-  };
-
   loadSettings();
 </script>
 
@@ -620,18 +571,28 @@
     return {projectName:name,savedAt:new Date().toISOString(),...c,total:fmt(c.total)};
   };
 
-  /* ── Logo handling ── */
+  /* ── Logo handling — compress via canvas to stay under localStorage limit ── */
   window.handleLogoUpload=function(e){
     const file=e.target.files[0]; if(!file) return;
-    if(file.size>512000){alert('Image must be under 500 KB. Please resize and try again.');return;}
-    const reader=new FileReader();
-    reader.onload=ev=>window.setLogoData(ev.target.result);
-    reader.readAsDataURL(file);
+    const img=new Image();
+    const url=URL.createObjectURL(file);
+    img.onload=function(){
+      const MAX=280; // max dimension px — keeps base64 small enough for localStorage
+      let w=img.width, h=img.height;
+      if(w>MAX||h>MAX){ const s=MAX/Math.max(w,h); w=Math.round(w*s); h=Math.round(h*s); }
+      const canvas=document.createElement('canvas');
+      canvas.width=w; canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      const dataUrl=canvas.toDataURL('image/png',0.85);
+      URL.revokeObjectURL(url);
+      window.setLogoData(dataUrl);
+    };
+    img.onerror=()=>{ URL.revokeObjectURL(url); alert('Could not read image file.'); };
+    img.src=url;
   };
   window.setLogoData=function(dataUrl){
     window._logoDataUrl=dataUrl;
-    const preview=document.getElementById('logoPreview');
-    preview.innerHTML=`<img src="${dataUrl}" alt="Logo">`;
+    document.getElementById('logoPreview').innerHTML=`<img src="${dataUrl}" alt="Logo">`;
     document.getElementById('logoRemoveBtn').style.display='inline';
   };
   window.removeLogo=function(){
@@ -641,36 +602,83 @@
     document.getElementById('logoFileInput').value='';
   };
 
-  /* ── Quote preview ── */
-  window.openQuotePreview=function(){
+  /* ── Validate project name from main form ── */
+  function getProjectName(){
+    return document.getElementById('projectName').value.trim();
+  }
+
+  /* ── Save to localStorage helper ── */
+  function saveEstimateToStorage(data){
+    try {
+      const raw=localStorage.getItem(LS_ESTIMATES);
+      const estimates=raw?JSON.parse(raw):[];
+      estimates.unshift(data);
+      if(estimates.length>100) estimates.length=100;
+      localStorage.setItem(LS_ESTIMATES,JSON.stringify(estimates));
+      return true;
+    } catch(e){ return false; }
+  }
+
+  /* ── Working copy save (triggered from save choice modal) ── */
+  window.confirmInternalSave=function(){
+    const name=getProjectName();
+    if(!name){
+      document.getElementById('saveChoiceError').textContent='Please enter a customer / project name before saving.';
+      closeModal('modalSaveChoice');
+      document.getElementById('projectName').focus();
+      document.getElementById('projectName').style.borderColor='var(--red)';
+      setTimeout(()=>document.getElementById('projectName').style.borderColor='',2500);
+      return;
+    }
+    document.getElementById('saveChoiceError').textContent='';
+    const ok=saveEstimateToStorage({...window.gatherData(name),type:'working',savedAt:new Date().toISOString()});
     closeModal('modalSaveChoice');
+    window.showToast(ok?'Working copy saved — '+name:'Save failed — storage may be full');
+  };
+
+  /* ── Quote: save first, then open preview ── */
+  window.confirmQuoteAndPreview=function(){
+    const name=getProjectName();
+    if(!name){
+      document.getElementById('saveChoiceError').textContent='Please enter a customer / project name before saving.';
+      closeModal('modalSaveChoice');
+      document.getElementById('projectName').focus();
+      document.getElementById('projectName').style.borderColor='var(--red)';
+      setTimeout(()=>document.getElementById('projectName').style.borderColor='',2500);
+      return;
+    }
+    document.getElementById('saveChoiceError').textContent='';
     const c=computeCosts();
+    const quoteNum='Q-'+Date.now().toString().slice(-6);
+    saveEstimateToStorage({...window.gatherData(name),type:'quote',quoteNum,savedAt:new Date().toISOString()});
+    closeModal('modalSaveChoice');
+    buildAndShowQuote(name,quoteNum,c);
+  };
+
+  /* ── Build and display the quote document ── */
+  function buildAndShowQuote(name,quoteNum,c){
     const company=document.getElementById('r-company-name').value.trim()||'Your Company Name';
     const tag=document.getElementById('r-company-tag').value.trim();
     const terms=document.getElementById('r-payment-terms').value.trim();
-    const quoteNum='Q-'+Date.now().toString().slice(-6);
     const today=new Date().toLocaleDateString('en-CA',{year:'numeric',month:'long',day:'numeric'});
-    window._quoteProjectName=quoteNum;
-
     const logoHtml=window._logoDataUrl
       ?`<img class="q-logo" src="${window._logoDataUrl}" alt="Logo">`
-      :`<div style="font-size:11px;color:#ccc;font-family:sans-serif">No logo uploaded</div>`;
-
+      :`<div style="font-size:11px;color:#ccc;font-family:sans-serif">No logo set</div>`;
+    const SLOPE_LABELS={low:'Low / flat (2–4/12)',std:'Standard (4–7/12)',steep:'Steep (7–9/12)',vsteep:'Very steep (9/12+)'};
     const scopeRows=[
+      ['Customer / project', name],
       ['Panel type', PROFILE_LABELS[c.profile]],
       ['Square footage', c.sqft.toLocaleString()+' ft²'],
-      c.storeys>1?['Storeys', c.storeys]:null,
-      ['Roof slope', c.slopeName||window.currentSlope],
-      c.valleyFt>0?['Valleys / hips', c.valleyFt+' linear ft']:null,
-      c.vents>0?['Vent pipe flashings', c.vents]:null,
-      c.skylights>0?['Skylights', c.skylights]:null,
-      c.chimneys>0?['Chimneys / penetrations', c.chimneys]:null,
-      c.tearoff>0?['Existing roof removal', c.tearoff+' layer'+(c.tearoff>1?'s':'')]:null,
-      c.km>0?['Travel distance', c.km+' km × '+c.days+' day'+(c.days>1?'s':'')]:null,
+      c.storeys>1?['Storeys',c.storeys+' storeys']:null,
+      ['Roof slope', SLOPE_LABELS[window.currentSlope]||window.currentSlope],
+      c.valleyFt>0?['Valleys / hips',c.valleyFt+' linear ft']:null,
+      c.vents>0?['Vent pipe flashings',c.vents]:null,
+      c.skylights>0?['Skylights',c.skylights]:null,
+      c.chimneys>0?['Chimneys / penetrations',c.chimneys]:null,
+      c.tearoff>0?['Roof removal',c.tearoff+' layer'+(c.tearoff>1?'s':'')]:null,
+      c.km>0?['Travel',c.km+' km × '+c.days+' day'+(c.days>1?'s':'')]:null,
     ].filter(Boolean);
-
     const deposit=Math.round(c.total*0.5);
-
     document.getElementById('quoteDoc').innerHTML=`
       <div class="q-header">
         <div class="q-logo-wrap">
@@ -681,7 +689,7 @@
         <div class="q-meta">
           <div class="q-meta-label">Quote number</div>
           <div class="q-meta-val">${quoteNum}</div>
-          <div class="q-meta-label">Date</div>
+          <div class="q-meta-label">Date issued</div>
           <div class="q-meta-val">${today}</div>
         </div>
       </div>
@@ -707,9 +715,8 @@
       </div>
       <div class="q-footer">${company} · This estimate is valid for 30 days from the date of issue.<br>Pricing subject to change if site conditions differ from information provided.</div>
     `;
-
     document.getElementById('modalQuote').classList.add('open');
-  };
+  }
 
   /* ── Modal controls ── */
   window.openLock=function(){
@@ -731,14 +738,8 @@
   window.lockAdmin=function(){ isAdmin=false; document.getElementById('lockLabel').textContent='Admin'; };
   window.closeModal=function(id){ document.getElementById(id).classList.remove('open'); };
   window.openSaveChoice=function(){
+    document.getElementById('saveChoiceError').textContent='';
     document.getElementById('modalSaveChoice').classList.add('open');
-  };
-  window.openInternalSave=function(){
-    closeModal('modalSaveChoice');
-    document.getElementById('internalError').textContent='';
-    document.getElementById('internalName').value='';
-    document.getElementById('modalInternal').classList.add('open');
-    setTimeout(()=>document.getElementById('internalName').focus(),50);
   };
   window.showToast=function(msg){
     const t=document.getElementById('toast');
