@@ -319,16 +319,19 @@
           <input type="text" id="r-company-tag" placeholder="e.g. Licensed &amp; Insured · (555) 123-4567" maxlength="80">
         </div>
       </div>
-      <div class="logo-upload-row">
-        <div class="logo-preview" id="logoPreview">
-          <div class="logo-placeholder">No logo</div>
+      <div style="margin-top:12px">
+        <div class="rates-field">
+          <label>Logo filename <span style="font-weight:400;text-transform:none;font-style:italic;color:#aaa">— place the image file in the same folder as this HTML on GitHub</span></label>
+          <input type="text" id="r-logo-file" placeholder="e.g. logo.png or apex-logo.jpg" maxlength="120" oninput="previewLogoFile()">
         </div>
-        <div>
-          <label style="margin-bottom:6px;display:block">Company logo</label>
-          <label class="logo-upload-btn" for="logoFileInput">📁 Upload image</label>
-          <input type="file" id="logoFileInput" accept="image/*" style="display:none" onchange="handleLogoUpload(event)">
-          <span class="logo-remove-btn" id="logoRemoveBtn" onclick="removeLogo()">Remove</span>
-          <p style="font-size:11px;color:#aaa;margin-top:6px">PNG, JPG or SVG · Max 500 KB</p>
+        <div style="display:flex;align-items:center;gap:12px;margin-top:10px">
+          <div class="logo-preview" id="logoPreview">
+            <div class="logo-placeholder">No logo</div>
+          </div>
+          <div style="font-size:11px;color:#aaa;line-height:1.7">
+            Upload your image file to your GitHub repo<br>in the same folder as <code style="background:#eee;padding:1px 5px;border-radius:3px">index.html</code><br>then type the exact filename above.<br>
+            <span style="color:#3d4a52;font-weight:500">Preview updates as you type.</span>
+          </div>
         </div>
       </div>
     </div>
@@ -453,7 +456,7 @@
 
   function setSync(msg){ const el=document.getElementById('syncStatus'); if(el) el.textContent=msg; }
 
-  // Must be declared before loadSettings so setLogoData() can write to it
+  // Must be declared before loadSettings runs
   window._logoDataUrl = '';
   window._quoteProjectName = '';
 
@@ -467,7 +470,10 @@
         if(d['payment-terms']) document.getElementById('r-payment-terms').value=d['payment-terms'];
         if(d['company-name'])  document.getElementById('r-company-name').value=d['company-name'];
         if(d['company-tag'])   document.getElementById('r-company-tag').value=d['company-tag'];
-        if(d['logo-data'])     window.setLogoData(d['logo-data']);
+        if(d['logo-file']){
+          document.getElementById('r-logo-file').value=d['logo-file'];
+          previewLogoFile();
+        }
         setSync('Settings loaded ✓');
       } else { setSync('Using default rates'); }
     } catch(e){ setSync('Could not load saved settings'); }
@@ -481,7 +487,7 @@
     settings['payment-terms'] = document.getElementById('r-payment-terms').value.trim();
     settings['company-name']  = document.getElementById('r-company-name').value.trim();
     settings['company-tag']   = document.getElementById('r-company-tag').value.trim();
-    settings['logo-data']     = window._logoDataUrl || '';
+    settings['logo-file']     = document.getElementById('r-logo-file').value.trim();
     try {
       localStorage.setItem(LS_SETTINGS, JSON.stringify(settings));
       const msg=document.getElementById('saveMsg');
@@ -500,7 +506,7 @@
   const ADMIN_PW='roof2024';
   let isAdmin=false;
   window.currentSlope='low';
-  // NOTE: _logoDataUrl must NOT be re-initialized here — it is set by loadSettings() above
+  // NOTE: _logoDataUrl not used — logo is a filename loaded directly from GitHub
 
   const SLOPE_NOTES={
     low:'Low slope steel roofing requires a minimum 3/12 pitch — confirm panel manufacturer specs.',
@@ -579,35 +585,19 @@
     return {projectName:name,savedAt:new Date().toISOString(),...c,total:fmt(c.total)};
   };
 
-  /* ── Logo handling — compress via canvas to stay under localStorage limit ── */
-  window.handleLogoUpload=function(e){
-    const file=e.target.files[0]; if(!file) return;
-    const img=new Image();
-    const url=URL.createObjectURL(file);
-    img.onload=function(){
-      const MAX=280; // max dimension px — keeps base64 small enough for localStorage
-      let w=img.width, h=img.height;
-      if(w>MAX||h>MAX){ const s=MAX/Math.max(w,h); w=Math.round(w*s); h=Math.round(h*s); }
-      const canvas=document.createElement('canvas');
-      canvas.width=w; canvas.height=h;
-      canvas.getContext('2d').drawImage(img,0,0,w,h);
-      const dataUrl=canvas.toDataURL('image/png',0.85);
-      URL.revokeObjectURL(url);
-      window.setLogoData(dataUrl);
-    };
-    img.onerror=()=>{ URL.revokeObjectURL(url); alert('Could not read image file.'); };
-    img.src=url;
-  };
-  window.setLogoData=function(dataUrl){
-    window._logoDataUrl=dataUrl;
-    document.getElementById('logoPreview').innerHTML=`<img src="${dataUrl}" alt="Logo">`;
-    document.getElementById('logoRemoveBtn').style.display='inline';
-  };
-  window.removeLogo=function(){
-    window._logoDataUrl='';
-    document.getElementById('logoPreview').innerHTML='<div class="logo-placeholder">No logo</div>';
-    document.getElementById('logoRemoveBtn').style.display='none';
-    document.getElementById('logoFileInput').value='';
+  /* ── Logo — filename-based, loads from same folder as HTML ── */
+  window.previewLogoFile = function(){
+    const filename = document.getElementById('r-logo-file').value.trim();
+    const preview  = document.getElementById('logoPreview');
+    if(!filename){
+      preview.innerHTML='<div class="logo-placeholder">No logo</div>';
+      window._logoDataUrl='';
+      return;
+    }
+    const img = new Image();
+    img.onload  = function(){ preview.innerHTML=`<img src="${filename}" alt="Logo">`; window._logoDataUrl=filename; };
+    img.onerror = function(){ preview.innerHTML='<div class="logo-placeholder" style="color:#c0392b">Not found</div>'; window._logoDataUrl=''; };
+    img.src = filename;
   };
 
   /* ── Validate project name from main form ── */
@@ -669,9 +659,10 @@
     const tag=document.getElementById('r-company-tag').value.trim();
     const terms=document.getElementById('r-payment-terms').value.trim();
     const today=new Date().toLocaleDateString('en-CA',{year:'numeric',month:'long',day:'numeric'});
-    const logoHtml=window._logoDataUrl
-      ?`<img class="q-logo" src="${window._logoDataUrl}" alt="Logo">`
-      :`<div style="font-size:11px;color:#ccc;font-family:sans-serif">No logo set</div>`;
+    const logoFile = document.getElementById('r-logo-file').value.trim();
+    const logoHtml = logoFile
+      ? `<img class="q-logo" src="${logoFile}" alt="Logo">`
+      : `<div style="font-size:11px;color:#ccc;font-family:sans-serif">No logo set</div>`;
     const SLOPE_LABELS={low:'Low / flat (2–4/12)',std:'Standard (4–7/12)',steep:'Steep (7–9/12)',vsteep:'Very steep (9/12+)'};
     const scopeRows=[
       ['Customer / project', name],
