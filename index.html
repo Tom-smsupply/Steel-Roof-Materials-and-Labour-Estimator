@@ -46,6 +46,8 @@
     .disclaimer{font-size:11px;color:#4a6570;line-height:1.5}
     .save-estimate-btn{background:var(--gun);color:#f0f4f6;border:none;padding:9px 20px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;transition:background 0.15s;white-space:nowrap;flex-shrink:0}
     .save-estimate-btn:hover{background:var(--gun-dark)}
+    .new-estimate-btn{background:transparent;color:#7a9aa8;border:0.5px solid #3a5060;padding:9px 16px;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;transition:all 0.15s;white-space:nowrap;flex-shrink:0}
+    .new-estimate-btn:hover{background:rgba(255,255,255,0.06);color:#c8dce4;border-color:#5a7a8a}
     /* Modals shared */
     .modal-bg{display:none;position:fixed;inset:0;background:rgba(14,20,24,0.7);align-items:center;justify-content:center;z-index:100}.modal-bg.open{display:flex}
     .modal-sm{background:#fff;border-radius:12px;padding:32px 28px;width:340px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
@@ -178,7 +180,7 @@
         <input type="text" id="projectName" placeholder="e.g. 456 Oak Ave – Smith" maxlength="80">
       </div>
       <div class="grid2">
-        <div><label>Total square footage (ft²)</label><input type="number" id="sqft" value="1500" min="100" max="20000" step="50" oninput="calc()"></div>
+        <div><label>Total square footage (ft²)</label><input type="number" id="sqft" value="" min="100" max="20000" step="50" oninput="calc()" placeholder="e.g. 1500"></div>
         <div><label>Number of storeys</label>
           <select id="storeys" onchange="calc()">
             <option value="1">1 storey</option><option value="2">2 storey</option><option value="3">3 storey</option>
@@ -220,8 +222,8 @@
         <div><label>Chimneys / penetrations</label><input type="number" id="chimneys" value="0" min="0" max="10" oninput="calc()"></div>
         <div><label>Existing roof removal</label>
           <select id="tearoff" onchange="calc()">
-            <option value="0">No removal (new build)</option>
-            <option value="1" selected>Remove 1 layer</option>
+            <option value="0" selected>No removal (new build)</option>
+            <option value="1">Remove 1 layer</option>
             <option value="2">Remove 2 layers</option>
           </select>
         </div>
@@ -238,7 +240,10 @@
     </div>
     <div class="results-footer">
       <p class="disclaimer">Estimates are for budgeting purposes only.<br>Final pricing subject to on-site inspection.</p>
-      <button class="save-estimate-btn" onclick="openSaveChoice()">Save estimate</button>
+      <div style="display:flex;gap:8px;flex-shrink:0">
+        <button class="new-estimate-btn" onclick="confirmNewEstimate()">New estimate</button>
+        <button class="save-estimate-btn" onclick="openSaveChoice()">Save estimate</button>
+      </div>
     </div>
   </div>
 
@@ -356,13 +361,13 @@
             <td>Standing seam</td>
             <td><input type="number" id="r-mat-standing" step="0.25" value="6.00" oninput="calc()"></td>
             <td><input type="number" id="r-markup-standing" step="1" value="20" min="0" max="200" oninput="calc()"></td>
-            <td><input type="number" id="r-labour-standing" step="0.25" value="4.50" oninput="calc()"></td>
+            <td><input type="number" id="r-labour-standing" step="0.25" value="7.00" oninput="calc()"></td>
           </tr>
           <tr>
             <td>Steel shingle / tile</td>
             <td><input type="number" id="r-mat-shingle" step="0.25" value="5.00" oninput="calc()"></td>
             <td><input type="number" id="r-markup-shingle" step="1" value="20" min="0" max="200" oninput="calc()"></td>
-            <td><input type="number" id="r-labour-shingle" step="0.25" value="4.00" oninput="calc()"></td>
+            <td><input type="number" id="r-labour-shingle" step="0.25" value="5.00" oninput="calc()"></td>
           </tr>
         </tbody>
       </table>
@@ -373,11 +378,11 @@
       <div class="rates-block-title">Labour add-ons</div>
       <div class="rates-grid3">
         <div class="rates-field"><label>Valley / hip ($/lin ft)</label><input type="number" id="r-valley" step="1" value="18" oninput="calc()"></div>
-        <div class="rates-field"><label>Vent pipe flashing ($/each)</label><input type="number" id="r-vent" step="5" value="95" oninput="calc()"></div>
-        <div class="rates-field"><label>Skylight flash &amp; seal ($/each)</label><input type="number" id="r-sky" step="5" value="300" oninput="calc()"></div>
+        <div class="rates-field"><label>Vent pipe flashing ($/each)</label><input type="number" id="r-vent" step="5" value="75" oninput="calc()"></div>
+        <div class="rates-field"><label>Skylight flash &amp; seal ($/each)</label><input type="number" id="r-sky" step="5" value="200" oninput="calc()"></div>
       </div>
       <div class="rates-grid3" style="margin-top:10px">
-        <div class="rates-field"><label>Chimney / penetration ($/each)</label><input type="number" id="r-chimney" step="5" value="225" oninput="calc()"></div>
+        <div class="rates-field"><label>Chimney / penetration ($/each)</label><input type="number" id="r-chimney" step="5" value="200" oninput="calc()"></div>
         <div class="rates-field"><label>Roof removal — 1 layer ($/ft²)</label><input type="number" id="r-t1" step="0.10" value="0.65" oninput="calc()"></div>
         <div class="rates-field"><label>Roof removal — 2 layers ($/ft²)</label><input type="number" id="r-t2" step="0.10" value="1.15" oninput="calc()"></div>
       </div>
@@ -399,8 +404,8 @@
       <div class="rates-block-title">Storey premiums <span class="rates-block-subtitle">— added to labour ($/ft²)</span></div>
       <div class="rates-grid3">
         <div class="rates-field"><label>1 storey (base)</label><input type="number" value="0.00" disabled style="opacity:0.4;cursor:not-allowed"></div>
-        <div class="rates-field"><label>2nd storey add</label><input type="number" id="r-s2" step="0.25" value="0.40" oninput="calc()"></div>
-        <div class="rates-field"><label>3rd storey add</label><input type="number" id="r-s3" step="0.25" value="0.85" oninput="calc()"></div>
+        <div class="rates-field"><label>2nd storey add</label><input type="number" id="r-s2" step="0.25" value="0.25" oninput="calc()"></div>
+        <div class="rates-field"><label>3rd storey add</label><input type="number" id="r-s3" step="0.25" value="0.50" oninput="calc()"></div>
       </div>
     </div>
 
@@ -447,11 +452,11 @@
   ];
   const DEFAULTS = {
     'r-mat-corrugated':3.50,'r-markup-corrugated':20,'r-labour-corrugated':3.50,
-    'r-mat-standing':6.00,  'r-markup-standing':20,  'r-labour-standing':4.50,
-    'r-mat-shingle':5.00,   'r-markup-shingle':20,   'r-labour-shingle':4.00,
-    'r-valley':18,'r-vent':95,'r-sky':300,'r-chimney':225,'r-t1':0.65,'r-t2':1.15,
+    'r-mat-standing':6.00,  'r-markup-standing':20,  'r-labour-standing':7.00,
+    'r-mat-shingle':5.00,   'r-markup-shingle':20,   'r-labour-shingle':5.00,
+    'r-valley':18,'r-vent':75,'r-sky':200,'r-chimney':200,'r-t1':0.65,'r-t2':1.15,
     'r-slope-low':0,'r-slope-std':0,'r-slope-steep':0.75,'r-slope-vsteep':1.75,
-    'r-s2':0.40,'r-s3':0.85,'r-km':1.50,'r-km-min':0
+    'r-s2':0.25,'r-s3':0.50,'r-km':1.50,'r-km-min':0
   };
 
   function setSync(msg){ const el=document.getElementById('syncStatus'); if(el) el.textContent=msg; }
@@ -749,7 +754,36 @@
     bg.addEventListener('click',e=>{ if(e.target===bg) bg.classList.remove('open'); });
   });
 
-  calc();
+  /* ── Reset all inputs to defaults ── */
+  window.resetCalc=function(){
+    document.getElementById('projectName').value='';
+    document.getElementById('sqft').value='';
+    document.getElementById('storeys').value='1';
+    document.getElementById('profile').value='standing';
+    document.getElementById('km').value='0';
+    document.getElementById('days').value='1';
+    document.getElementById('vents').value='0';
+    document.getElementById('valleys').value='0';
+    document.getElementById('skylights').value='0';
+    document.getElementById('chimneys').value='0';
+    document.getElementById('tearoff').value='0';
+    // Reset slope buttons to Low
+    document.querySelectorAll('.slope-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelector('.slope-btn').classList.add('active');
+    window.currentSlope='low';
+    document.getElementById('slopeNote').classList.add('hidden');
+    calc();
+  };
+
+  /* ── New estimate — confirm if unsaved ── */
+  window.confirmNewEstimate=function(){
+    const name=document.getElementById('projectName').value.trim();
+    if(!name){ window.resetCalc(); return; }
+    if(confirm('Start a new estimate? The current estimate for "'+name+'" will be cleared.\n\nMake sure you have saved it first.')){ window.resetCalc(); }
+  };
+
+  // Reset inputs cleanly on every page load
+  window.resetCalc();
 </script>
 </body>
 </html>
